@@ -209,3 +209,9 @@ code { font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
 #busy::after { content: ''; position: absolute; top: 0; bottom: 0; width: 40%; background: var(--focus); animation: busy 1.1s ease-in-out infinite; }
 @keyframes busy { from { left: -40%; } to { left: 100%; } }
 @media (prefers-reduced-motion: reduce) { #busy::after { animation: none; left: 0; width: 100%; } }
+
+/* demo outlets: the real distance, highlighted, not enforced */
+.card-demo { background: #fff4e0; border: 3px solid #e0892b; }
+.demo-tag { display: inline-block; font-weight: 800; letter-spacing: .08em; font-size: .8rem; background: #e0892b; color: #14213d; padding: 2px 8px; border-radius: 6px; margin: 0 0 6px; }
+.demo-distance { font-size: 1.6rem; font-weight: 800; color: #9a3412; margin: 4px 0; }
+.badge-demo { background: #e0892b; color: #14213d; font-weight: 800; }

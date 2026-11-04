@@ -47,7 +47,7 @@
   var df = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Karachi', day: 'numeric', month: 'short', year: 'numeric' });
   function when(iso) { return iso ? dtf.format(new Date(iso)) : ''; }
   function day(iso) { return iso ? df.format(new Date(iso)) : ''; }
-  function metres(m) { return m === null || m === undefined ? '' : Math.round(m) + ' m'; }
+  function metres(m) { return m === null || m === undefined ? '' : m >= 1000 ? (Math.round(m / 100) / 10) + ' km' : Math.round(m) + ' m'; }
   var ROLE = { order_booker: 'Order booker', supervisor: 'Supervisor', mo: 'MO', tsm: 'TSM', asm: 'ASM', amtm: 'AMTM', rsm: 'RSM' };
   var LEVEL_CLASS = { normal: 'lv-normal', overdue: 'lv-overdue', high_priority: 'lv-high', critical: 'lv-critical', not_live: 'lv-muted', not_monitored: 'lv-muted' };
 
@@ -227,7 +227,7 @@
         shown.forEach(function (o) {
           add(list, h('li', null, h('a', { class: 'row', href: '#/outlet/' + encodeURIComponent(o.id) },
             h('div', { class: 'row-main' }, h('strong', { text: o.name }), h('span', { class: 'small quiet', text: (o.code ? o.code + ' · ' : '') + o.territory })),
-            o.monitored ? levelBadge(o.level, o.levelText, o.days) : h('span', { class: 'badge lv-muted', text: 'Not monitored' }))));
+            o.monitored ? levelBadge(o.level, o.levelText, o.days) : o.demo ? h('span', { class: 'badge badge-demo', text: 'DEMO' }) : h('span', { class: 'badge lv-muted', text: 'Not monitored' }))));
         });
       }
       draw();
@@ -245,7 +245,8 @@
         h('div', null, h('strong', { text: o.levelText }),
           h('p', { class: 'small', text: o.lastVisitAt ? 'Last verified visit ' + day(o.lastVisitAt) + (o.lastVisitBy ? ', ' + o.lastVisitBy : '') : 'No verified visit yet' })));
       var startArea = h('div', { class: 'stack' });
-      if (!o.monitored) add(startArea, msg('info', 'This outlet is not active with a deployed countertop, so no visit can be recorded.'));
+      if (o.demo) add(startArea, msg('info', 'DEMO outlet: your distance from the registered point is checked and shown, but the 50 m limit is not enforced. Demo visits never count on the dashboard or in reports.'));
+      if (!o.monitored && !o.demo) add(startArea, msg('info', 'This outlet is not active with a deployed countertop, so no visit can be recorded.'));
       else if (o.myOpenVisitId) add(startArea, button('Continue visit', function () { go('#/visit/' + o.myOpenVisitId); }, 'btn-primary btn-block btn-lg'));
       else add(startArea, startButton(o, startArea));
       var ct = { present: 'Present', missing: 'Missing', unclear: 'Photo unclear', pending: 'Waiting for admin check', not_checked: 'Not checked yet' };
@@ -258,7 +259,7 @@
           h('dt', { text: 'Planogram' }), h('dd', { text: pg[o.planogram] || o.planogram }),
           o.visitsAwaitingReview ? [h('dt', { text: 'Review' }), h('dd', { text: o.visitsAwaitingReview + (o.visitsAwaitingReview === 1 ? ' visit' : ' visits') + ' waiting for location review' })] : null)),
         h('section', { class: 'card' }, h('h2', { text: 'Location' }),
-          h('p', { class: 'small', text: 'Registered point ' + o.lat + ', ' + o.lon + '. Your phone must be within ' + o.radiusM + ' m when you take the shop-front photo.' }),
+          h('p', { class: 'small', text: 'Registered point ' + o.lat + ', ' + o.lon + (o.demo ? '. Demo outlet: the distance is shown but the ' + o.radiusM + ' m limit is not enforced.' : '. Your phone must be within ' + o.radiusM + ' m when you take the shop-front photo.') }),
           h('a', { class: 'btn btn-secondary btn-block', href: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(o.lat + ',' + o.lon), target: '_blank', rel: 'noopener noreferrer', text: 'Open in Google Maps' })),
         h('section', { class: 'card' }, h('h2', { text: 'Responsible' }), h('dl', { class: 'kv' },
           o.responsible.map(function (r) { return [h('dt', { text: ROLE[r.role] || r.role }), h('dd', { text: r.name })]; }))),
@@ -378,6 +379,17 @@
         gps.stop();
         add(body, h('section', { class: 'card card-ok', role: 'status', 'data-testid': 'gps-result' },
           h('h2', { text: 'Location verified' }), h('p', { text: 'You are ' + metres(c.distanceM) + ' from the shop (GPS ±' + Math.round(c.accuracyM) + ' m).' })),
+          button('Next: countertop photo', function () { showVisit(v.id); }, 'btn-primary btn-block btn-lg'));
+        return;
+      }
+      if (c.result === 'demo_accepted') {
+        gps.stop();
+        var outside = c.distanceM > c.radiusM;
+        add(body, h('section', { class: 'card card-demo', role: 'status', 'data-testid': 'gps-result' },
+          h('p', { class: 'demo-tag', text: 'DEMO OUTLET' }),
+          h('h2', { text: outside ? 'Outside the ' + c.radiusM + ' m radius' : 'Location not confirmed' }),
+          h('p', { class: 'demo-distance', text: metres(c.distanceM) + ' from the registered point' }),
+          h('p', { text: d.message })),
           button('Next: countertop photo', function () { showVisit(v.id); }, 'btn-primary btn-block btn-lg'));
         return;
       }
