@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' https://script.google.com https://script.googleusercontent.com; manifest-src 'self'; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#14213d">
+  <title>EBM Countertop Tracker</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="app.css">
+  <script src="config.js" defer></script>
+  <script src="api.js" defer></script>
+  <script src="camera.js" defer></script>
+  <script src="xlsx.js" defer></script>
+  <script src="admin.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div id="net" class="netbar" role="status" hidden>No connection. Work you already sent is safe.</div>
+  <div id="app" aria-live="polite"><p class="boot">Loading…</p></div>
+  <noscript><p class="boot">Turn on JavaScript to use the EBM Countertop Tracker.</p></noscript>
+</body>
+</html>
