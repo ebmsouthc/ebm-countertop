@@ -15,6 +15,7 @@
     if (/REPLACE_WITH/.test(window.EBM_CONFIG.API_URL)) {
       return Promise.resolve({ ok: false, code: 503, error: 'This copy of the app is not connected yet: put the Apps Script web-app address into config.js.' });
     }
+    busy(1);
     var body = Object.assign({}, payload || {}, { action: action, token: getToken() });
     var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
     var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, TIMEOUT_MS) : null;
@@ -34,7 +35,16 @@
       });
     }, function () {
       return { ok: false, network: true, code: 0, error: networkMessage(action) };
-    }).finally(function () { if (timer) clearTimeout(timer); });
+    }).finally(function () { if (timer) clearTimeout(timer); busy(-1); });
+  }
+
+  /** A thin moving bar at the top while the app waits for the server. */
+  var pending = 0;
+  function busy(d) {
+    pending = Math.max(0, pending + d);
+    var bar = document.getElementById('busy');
+    if (!bar) { bar = document.createElement('div'); bar.id = 'busy'; bar.setAttribute('role', 'progressbar'); bar.setAttribute('aria-label', 'Loading'); document.body.appendChild(bar); }
+    bar.hidden = pending === 0;
   }
 
   /** What to tell the user when a request got no answer: depends on what they were doing. */
