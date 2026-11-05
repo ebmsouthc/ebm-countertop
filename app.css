@@ -215,3 +215,5 @@ code { font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
 .demo-tag { display: inline-block; font-weight: 800; letter-spacing: .08em; font-size: .8rem; background: #e0892b; color: #14213d; padding: 2px 8px; border-radius: 6px; margin: 0 0 6px; }
 .demo-distance { font-size: 1.6rem; font-weight: 800; color: #9a3412; margin: 4px 0; }
 .badge-demo { background: #e0892b; color: #14213d; font-weight: 800; }
+.plano-note { display: block; max-width: 42ch; background: #fdecea; border-left: 4px solid #b3261e; padding: 4px 8px; }
+.stock-note { display: block; max-width: 42ch; background: #fff4e0; border-left: 4px solid #e0892b; padding: 4px 8px; }

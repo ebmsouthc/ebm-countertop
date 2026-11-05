@@ -210,7 +210,7 @@
         field('Name', input('name', raw.name)), field('Territory', select('territory', d.territories.map(function (t) { return [t, t]; }), raw.territory)),
         field('Town', input('town', raw.town)),
         field('Outlet status', select('status', [['active', 'Active'], ['inactive', 'Inactive'], ['closed', 'Closed']], raw.status)),
-        field('Deployment', select('deploymentStatus', [['deployed', 'Deployed'], ['pending_deployment', 'Pending deployment'], ['removed', 'Removed'], ['not_deployed', 'Not deployed']], raw.deploymentStatus)),
+        field('Deployment', select('deploymentStatus', [['deployed', 'Deployed'], ['pending_deployment', 'Pending deployment'], ['removed', 'Removed'], ['not_deployed', 'Not deployed'], ['demo', 'Demo (not monitored)']], raw.deploymentStatus)),
         field('Deployed on', input('deploymentDate', raw.deploymentDate, { type: 'date' }))
       ], 'Save details', function (f) {
         return call('adminUpdateOutlet', { id: raw.id, name: val(f, 'name'), territory: val(f, 'territory'), town: val(f, 'town'), status: val(f, 'status'),
@@ -266,7 +266,7 @@
       photos,
       h('dl', { class: 'kv' }, h('dt', { text: 'Countertop (field)' }), h('dd', { text: v.observation || '—' }),
         h('dt', { text: 'Field note' }), h('dd', { text: v.remarks || '—' }),
-        h('dt', { text: 'Decision' }), h('dd', null, dec ? dec.presence + ' / ' + dec.planogram + (dec.remarks ? ' — ' + dec.remarks : '') + ' (manual)' : counts ? h('a', { href: '#/admin/compliance/' + v.id, text: 'Pending manual verification: decide' }) : '—')),
+        h('dt', { text: 'Decision' }), h('dd', null, dec ? dec.presence + ' / ' + dec.planogram + (dec.remarks ? ' — ' + dec.remarks : '') + (dec.method === 'automatic' ? ' (automatic, AI)' : ' (manual)') : counts ? h('a', { href: '#/admin/compliance/' + v.id, text: 'Pending manual verification: decide' }) : '—')),
       v.reviews.length ? table([{ label: 'When', render: function (r) { return when(r.at); } }, { label: 'Action', key: 'action' }, { label: 'From', key: 'fromStatus' }, { label: 'To', key: 'toStatus' }, { label: 'Reason', key: 'reason' }, { label: 'By', key: 'by' }], v.reviews) : null,
       actions);
   }
@@ -321,12 +321,15 @@
       frame('compliance', [h('h1', { text: 'Compliance' }),
         d.reference ? h('p', { class: 'quiet', text: 'Judged against planogram reference version ' + d.reference.version + '.' }) : msg('error', 'No approved planogram reference yet. Upload and approve one under Set up › Planogram reference.', 'no-reference'),
         d.waitingLocationReview ? msg('info', d.waitingLocationReview + ' visit(s) must have their location approved first (Location reviews).') : null,
+        d.ai && d.ai.enabled ? msg('ok', 'Automatic check (AI) is on: correct and incorrect planograms are decided automatically; only visits the AI is not sure about are listed here.' +
+          (d.ai.checking ? ' ' + d.ai.checking + ' visit(s) are being checked now.' : ''), 'ai-on') : msg('info', 'Automatic check (AI) is off: every visit needs a decision here.', 'ai-off'),
         h('nav', { class: 'tabs' }, h('a', { href: '#/admin/compliance', 'aria-current': tab !== 'decided' ? 'page' : null, text: 'Waiting for a decision' }),
           h('a', { href: '#/admin/compliance?tab=decided', 'aria-current': tab === 'decided' ? 'page' : null, text: 'Decided' })),
         table([{ label: 'Visit', render: function (r) { return h('a', { href: '#/admin/compliance/' + r.visitId, text: when(r.submittedAt) }); } },
           { label: 'Outlet', render: function (r) { return r.outletName + ' · ' + r.outletCode; } }, { label: 'Territory', key: 'territory' }, { label: 'By', key: 'employee' },
           { label: 'Field answer', key: 'observation' }, { label: 'Result', key: 'complianceText' },
-          { label: 'Decided', render: function (r) { return r.decision ? when(r.decision.at) + ' · ' + r.decision.by : ''; } }],
+          tab === 'decided' ? { label: 'Decided', render: function (r) { return r.decision ? when(r.decision.at) + ' · ' + r.decision.by : ''; } }
+            : { label: 'Why it needs you', render: function (r) { return r.aiNote || '—'; } }],
         d.visits, { testid: 'compliance-queue', empty: tab === 'decided' ? 'Nothing decided yet.' : 'No visit is waiting for a decision.' })]);
     }, 'compliance');
   }
@@ -353,21 +356,32 @@
       frame('compliance', [h('a', { class: 'back', href: '#/admin/compliance', text: 'Back to compliance' }),
         h('h1', { text: v.outlet.name + ' · ' + when(v.submittedAt) }),
         h('p', { class: 'quiet', text: v.employee.name + ' · ' + v.statusText + ' · field answer: countertop ' + (v.observation || '—') + (v.remarks ? ' · note: ' + v.remarks : '') }),
-        last ? msg('info', 'Current result: ' + last.presence + ' / ' + last.planogram + (last.remarks ? ' — ' + last.remarks : '') + ' (manual decision).', 'current-decision') : msg('info', 'Pending manual verification. Automated checking is not used in this edition: every result is an administrator decision.'),
+        last ? msg('info', 'Current result: ' + last.presence + ' / ' + last.planogram + (last.remarks ? ' — ' + last.remarks : '') + (last.method === 'automatic' ? ' (automatic check, AI).' : ' (manual decision).'), 'current-decision') : msg('info', 'Pending manual verification: the automatic check could not decide this visit, or it is switched off.'),
         h('div', { class: 'grid-2' }, card('Countertop photo', photo), card('Approved planogram reference', refBox)),
         card('Decision', f)]);
     });
   }
 
   function planogramErrors() {
-    load('adminMonitor', { filters: { planogram: 'incorrect' } }, function (d) {
+    Promise.all([call('adminMonitor', { filters: { planogram: 'incorrect' } }), call('adminMonitor', { filters: { stock: 'low' } })]).then(function (rs) {
+      if (!rs[0].ok) { if (!U.common(rs[0])) frame('planogram-errors', [msg('error', rs[0].error)]); return; }
+      var d = rs[0].data, low = rs[1].ok ? rs[1].data.rows : [];
       frame('planogram-errors', [h('h1', { text: 'Planogram errors' }),
-        h('p', { class: 'quiet', text: 'Outlets whose latest decided visit found the planogram incorrect. An outlet leaves this list when a later visit is decided correct.' }),
+        h('p', { class: 'quiet', text: 'Outlets whose latest decided visit found the planogram incorrect, with what is wrong. Open the photo to see it. An outlet leaves this list when a later visit is decided correct; to correct a wrong automatic result, open the outlet and use Compliance.' }),
         table([{ label: 'Outlet', render: function (r) { return h('a', { href: '#/admin/outlet/' + encodeURIComponent(r.id), text: r.name }); } }, { label: 'Code', key: 'code' },
           { label: 'Territory', key: 'territory' }, { label: 'Last verified visit', render: function (r) { return when(r.lastVisitAt) + ' · ' + r.lastVisitBy; } },
+          { label: 'What is wrong', render: function (r) { return h('span', { class: 'plano-note', text: (r.planogramNote || '—') + (r.decisionMethod === 'automatic' ? '' : ' (manual decision)') }); } },
           { label: 'Countertop photo', render: function (r) { return photoButton(r.countertopPhotoId, 'Countertop · ' + r.name); } }, { label: 'Order booker', key: 'orderBooker' }, { label: 'TSM', key: 'tsm' }],
-        d.rows, { testid: 'planogram-errors', empty: 'No planogram errors.' })]);
-    }, 'planogram-errors');
+        d.rows, { testid: 'planogram-errors', empty: 'No planogram errors.' }),
+        h('h2', { text: 'Low stock (' + low.length + ')' }),
+        h('p', { class: 'quiet', text: 'Outlets whose latest visit found some SKUs short or empty. Low stock does not fail the planogram; refill these.' }),
+        table([{ label: 'Outlet', render: function (r) { return h('a', { href: '#/admin/outlet/' + encodeURIComponent(r.id), text: r.name }); } }, { label: 'Code', key: 'code' },
+          { label: 'Territory', key: 'territory' }, { label: 'Last verified visit', render: function (r) { return when(r.lastVisitAt) + ' · ' + r.lastVisitBy; } },
+          { label: 'SKUs short', render: function (r) { return h('span', { class: 'stock-note', text: r.stockNote || 'Low stock' }); } },
+          { label: 'Planogram', key: 'planogramText' },
+          { label: 'Countertop photo', render: function (r) { return photoButton(r.countertopPhotoId, 'Countertop · ' + r.name); } }, { label: 'Order booker', key: 'orderBooker' }],
+        low, { testid: 'low-stock', empty: 'No low stock reported.' })]);
+    });
   }
 
   function missing(tab) {
