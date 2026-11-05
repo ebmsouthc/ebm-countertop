@@ -344,19 +344,21 @@
       var last = v.assessments.length ? v.assessments[v.assessments.length - 1] : null;
       var option = function (value, label) { return h('label', { class: 'option' }, h('input', { type: 'radio', name: 'outcome', value: value }), ' ' + label); };
       var f = form([h('fieldset', { class: 'stack' }, h('legend', { text: 'Result' }),
-          option('present|correct', 'Countertop present, planogram correct'), option('present|incorrect', 'Countertop present, planogram incorrect'),
+          option('present|correct', 'Countertop present, planogram correct'), option('present|correct|low', 'Countertop present, low stock'),
+          option('present|incorrect', 'Countertop present, planogram incorrect'),
           option('missing|not_applicable', 'Countertop missing'), option('unclear|unclear', 'Photo unclear')),
         field('Remarks' + (last ? ' (required: you are correcting an earlier result)' : ' (optional)'), h('textarea', { id: 'remarks', name: 'remarks', class: 'input', rows: 2 }))],
         last ? 'Correct the result' : 'Save result', function (fm) {
           var o = fm.querySelector('input[name=outcome]:checked');
           if (!o) return Promise.resolve({ ok: false, error: 'Choose a result.' });
           var p = o.value.split('|');
-          return call('adminDecideCompliance', { visitId: v.id, presence: p[0], planogram: p[1], remarks: val(fm, 'remarks') });
+          if (p[2] === 'low' && !val(fm, 'remarks')) return Promise.resolve({ ok: false, error: 'Write which SKUs are short in Remarks (e.g. Piper\'s Gold Cup: top shelf empty).' });
+          return call('adminDecideCompliance', { visitId: v.id, presence: p[0], planogram: p[1], stock: p[2] || '', remarks: val(fm, 'remarks') });
         }, { done: function (data, out) { add(out, msg('ok', 'Saved: ' + data.complianceText + '.', 'decision-saved')); } });
       frame('compliance', [h('a', { class: 'back', href: '#/admin/compliance', text: 'Back to compliance' }),
         h('h1', { text: v.outlet.name + ' · ' + when(v.submittedAt) }),
         h('p', { class: 'quiet', text: v.employee.name + ' · ' + v.statusText + ' · field answer: countertop ' + (v.observation || '—') + (v.remarks ? ' · note: ' + v.remarks : '') }),
-        last ? msg('info', 'Current result: ' + last.presence + ' / ' + last.planogram + (last.remarks ? ' — ' + last.remarks : '') + (last.method === 'automatic' ? ' (automatic check, AI).' : ' (manual decision).'), 'current-decision') : msg('info', 'Pending manual verification: the automatic check could not decide this visit, or it is switched off.'),
+        last ? msg('info', 'Current result: ' + last.presence + ' / ' + last.planogram + (last.stock === 'low' ? ' / low stock' : '') + (last.remarks ? ' — ' + last.remarks : '') + (last.method === 'automatic' ? ' (automatic check, AI).' : ' (manual decision).'), 'current-decision') : msg('info', 'Pending manual verification: the automatic check could not decide this visit, or it is switched off.'),
         h('div', { class: 'grid-2' }, card('Countertop photo', photo), card('Approved planogram reference', refBox)),
         card('Decision', f)]);
     });
