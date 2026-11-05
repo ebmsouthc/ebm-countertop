@@ -490,7 +490,17 @@
             return form([h('div', { class: 'inline-form' }, input('rg-' + t.id, t.region, { name: 'region', 'aria-label': 'Region of ' + t.name, list: 'regions-list' }))], 'Save', function (f) {
               return call('adminSetRegion', { territory: t.name, region: f.elements.region.value.trim() });
             }, { ok: 'Saved.', cls: 'row-form' });
+          } }, { label: 'Go-live (this territory)', render: function (t) {
+            var cur = t.goLiveAt ? new Date(Date.parse(t.goLiveAt) + 5 * 3600000).toISOString().slice(0, 16) : '';
+            return form([h('p', { class: 'small', 'data-testid': 'territory-live-' + t.name, text: t.goLiveAt ? 'Live since ' + when(t.goLiveAt) : s.go_live_at ? 'Uses the go-live above' : 'Not live' }),
+              h('div', { class: 'inline-form' }, input('tl-' + t.id, cur, { name: 'tlive', type: 'datetime-local', 'aria-label': 'Go-live of ' + t.name })),
+              h('label', { class: 'option small' }, h('input', { type: 'checkbox', name: 'tconfirm', 'aria-label': 'Confirm go-live of ' + t.name }), ' Confirm')],
+              'Set go-live', function (f) {
+                var v = f.elements.tlive.value;
+                return call('adminSetTerritoryGoLive', { territory: t.name, goLiveAt: v ? v + ':00+05:00' : '', confirm: f.elements.tconfirm.checked });
+              }, { done: function () { settings(); }, cls: 'row-form' });
           } }], d.territories, { testid: 'regions' }),
+          h('p', { class: 'small quiet', text: 'A territory with its own go-live starts ageing from that moment; the others follow the go-live above (or stay not live).' }),
           h('datalist', { id: 'regions-list' }, Array.from(new Set(d.territories.map(function (t) { return t.region; }).filter(Boolean))).map(function (r) { return h('option', { value: r }); })),
           form([h('div', { class: 'grid-2' }, field('New territory', input('newTerritory', '')), field('Its region', input('newRegion', '')))], 'Add territory', function (f) {
             return call('adminAddTerritory', { name: val(f, 'newTerritory'), region: val(f, 'newRegion') });
