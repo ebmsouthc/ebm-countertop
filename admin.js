@@ -266,7 +266,8 @@
       photos,
       h('dl', { class: 'kv' }, h('dt', { text: 'Countertop (field)' }), h('dd', { text: v.observation || '—' }),
         h('dt', { text: 'Field note' }), h('dd', { text: v.remarks || '—' }),
-        h('dt', { text: 'Decision' }), h('dd', null, dec ? dec.presence + ' / ' + dec.planogram + (dec.remarks ? ' — ' + dec.remarks : '') + (dec.method === 'automatic' ? ' (automatic, AI)' : ' (manual)') : counts ? h('a', { href: '#/admin/compliance/' + v.id, text: 'Pending manual verification: decide' }) : '—')),
+        h('dt', { text: 'Decision' }), h('dd', null, dec ? [dec.presence + ' / ' + dec.planogram + (dec.remarks ? ' — ' + dec.remarks : '') + (dec.method === 'automatic' ? ' (automatic, AI) ' : ' (manual) '),
+          h('a', { href: '#/admin/compliance/' + v.id, text: 'Correct this result' })] : counts ? h('a', { href: '#/admin/compliance/' + v.id, text: 'Pending manual verification: decide' }) : '—')),
       v.reviews.length ? table([{ label: 'When', render: function (r) { return when(r.at); } }, { label: 'Action', key: 'action' }, { label: 'From', key: 'fromStatus' }, { label: 'To', key: 'toStatus' }, { label: 'Reason', key: 'reason' }, { label: 'By', key: 'by' }], v.reviews) : null,
       actions);
   }
