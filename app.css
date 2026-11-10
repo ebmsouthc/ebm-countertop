@@ -217,3 +217,27 @@ code { font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
 .badge-demo { background: #e0892b; color: #14213d; font-weight: 800; }
 .plano-note { display: block; max-width: 42ch; background: #fdecea; border-left: 4px solid #b3261e; padding: 4px 8px; }
 .stock-note { display: block; max-width: 42ch; background: #fff4e0; border-left: 4px solid #e0892b; padding: 4px 8px; }
+
+/* team visits */
+.tabbar.tabbar-4 ul { grid-template-columns: repeat(4, 1fr); }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.filters .field { display: block; margin-bottom: 12px; }
+.filters select, .filters input { width: 100%; }
+.photo-btns { display: flex; gap: 8px; margin-top: 6px; }
+
+/* day-by-day summary (made to be screenshotted) */
+.summary-card { border-top: 6px solid #e0892b; }
+.summary-eyebrow { margin: 0; font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #a2540f; }
+.summary-card h2 { margin: 4px 0 0; }
+.summary-period { font-weight: 700; margin: 8px 0; }
+.summary-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0 12px; }
+.summary-stats div { background: var(--bg, #eef1f6); border-radius: 10px; padding: 8px; text-align: center; }
+.summary-stats strong { display: block; font-size: 1.6rem; line-height: 1.1; }
+.summary-stats span { font-size: 12px; color: var(--ink-2); }
+.summary-day { border-top: 1px solid var(--line); padding-top: 8px; margin-top: 8px; }
+.summary-day h3 { font-size: 1rem; margin: 0 0 4px; }
+.summary-day ol { margin: 0; padding-left: 20px; }
+.summary-day li { margin: 3px 0; }
+.summary-foot { font-size: 11px; color: var(--ink-2); margin: 12px 0 0; }
+li.not-working { background: #fdecea; }

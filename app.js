@@ -92,7 +92,9 @@
     var tabs = opts.noTabs || !profile || profile.isAdmin ? null : h('nav', { class: 'tabbar', 'aria-label': 'Main' }, h('ul', null,
       tabItem('#/home', 'Home', tab === 'home', 'M3 11l9-8 9 8v10h-6v-6H9v6H3z'),
       tabItem('#/outlets', 'Outlets', tab === 'outlets', 'M4 4h16l1 5H3zm1 6h14v10H5zm4 3v7h6v-7z'),
-      tabItem('#/visits', 'My visits', tab === 'visits', 'M12 2a10 10 0 100 20 10 10 0 000-20zm1 5v5.4l4 2.4-1 1.7-5-3V7z')));
+      tabItem('#/visits', 'My visits', tab === 'visits', 'M12 2a10 10 0 100 20 10 10 0 000-20zm1 5v5.4l4 2.4-1 1.7-5-3V7z'),
+      profile.seesTeamVisits ? tabItem('#/team', 'Team visits', tab === 'team', 'M9 11a4 4 0 110-8 4 4 0 010 8zm8 0a3 3 0 110-6 3 3 0 010 6zM1 20c0-3.3 3.6-6 8-6s8 2.7 8 6v1H1zm16.5-6c3 .3 5.5 2.3 5.5 5v2h-4v-1c0-2.4-.6-4.4-1.5-6z') : null));
+    if (tabs && profile.seesTeamVisits) tabs.classList.add('tabbar-4');
     show([top, h('main', { class: 'page' + (opts.noTabs ? ' page-flow' : '') }, content), tabs]);
   }
   function tabItem(href, label, current, d) {
@@ -496,11 +498,15 @@
   }
 
   // ------------------------------------------------------------------ history
+  var summaryRange = null;
   function showVisits() {
-    api.call('myVisits', { limit: 100 }).then(function (res) {
+    var r = summaryRange || { from: pkToday(0), to: pkToday(0) };
+    Promise.all([api.call('mySummary', r), api.call('myVisits', { limit: 100 })]).then(function (rs) {
+      var res = rs[1];
       if (!res.ok) { loadFailed(res, showVisits); return; }
       var list = res.data.visits;
-      frame([h('h1', { text: 'My visits' }),
+      frame([h('h1', { text: 'My visits' }), rs[0].ok ? summaryCard(rs[0].data, r) : msg('error', rs[0].error),
+        h('h2', { text: 'All my recent visits' }),
         list.length ? h('ul', { class: 'list', 'data-testid': 'visit-list' }, list.map(function (v) {
           return h('li', null, h('div', { class: 'row' },
             h('div', { class: 'row-main' }, h('strong', { text: v.outletName }),
@@ -508,6 +514,103 @@
                 (v.observation === 'missing' ? ' · countertop missing' : '') })),
             h('span', { class: 'badge ' + (v.counts ? 'lv-normal' : v.status === 'submitted_for_review' ? 'lv-info' : 'lv-muted'), text: v.statusText })));
         })) : h('p', { class: 'quiet', text: 'No visits yet.' })], 'visits');
+    });
+  }
+
+  // ------------------------------------------------------------------ team visits (TSM and above)
+  /** Day-by-day summary, laid out to be screenshotted and sent to the TSM. */
+  function summaryCard(d, r) {
+    var pick = function (from, to) { summaryRange = { from: from, to: to }; showVisits(); };
+    var fromIn = h('input', { type: 'date', value: d.from, max: pkToday(0), 'aria-label': 'From date' });
+    var toIn = h('input', { type: 'date', value: d.to, max: pkToday(0), 'aria-label': 'To date' });
+    var controls = h('section', { class: 'card filters no-shot' },
+      h('div', { class: 'chips' },
+        button('Today', function () { pick(pkToday(0), pkToday(0)); }, 'btn-sm btn-secondary'),
+        button('Yesterday', function () { pick(pkToday(1), pkToday(1)); }, 'btn-sm btn-secondary'),
+        button('Last 7 days', function () { pick(pkToday(6), pkToday(0)); }, 'btn-sm btn-secondary')),
+      h('div', { class: 'grid-2' }, h('label', { class: 'field' }, h('span', { class: 'label', text: 'From' }), fromIn),
+        h('label', { class: 'field' }, h('span', { class: 'label', text: 'To' }), toIn)),
+      button('Show summary', function () { pick(fromIn.value, toIn.value); }, 'btn-primary btn-block', { 'data-testid': 'summary-apply' }));
+    var fmtDay = function (iso) { return new Date(iso + 'T12:00:00+05:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Karachi' }); };
+    var period = d.from === d.to ? fmtDay(d.from) : fmtDay(d.from) + ' – ' + fmtDay(d.to);
+    var card = h('section', { class: 'card summary-card', 'data-testid': 'visit-summary' },
+      h('p', { class: 'summary-eyebrow', text: 'PG Counter Top Tracker · visit summary' }),
+      h('h2', { text: d.person.name }),
+      h('p', { class: 'small quiet', text: d.person.designation + ' · ' + d.person.code + (d.person.territory ? ' · ' + d.person.territory : '') }),
+      h('p', { class: 'summary-period', text: period }),
+      h('div', { class: 'summary-stats' },
+        h('div', null, h('strong', { text: String(d.verifiedVisits) }), h('span', { text: 'verified visits' })),
+        h('div', null, h('strong', { text: String(d.outlets) }), h('span', { text: 'outlets' })),
+        h('div', null, h('strong', { text: String(d.daysWorked) }), h('span', { text: d.daysWorked === 1 ? 'day worked' : 'days worked' }))),
+      d.days.map(function (day) {
+        return h('div', { class: 'summary-day' }, h('h3', { text: fmtDay(day.date) + ' · ' + day.visits.length + (day.visits.length === 1 ? ' outlet' : ' outlets') }),
+          day.visits.length ? h('ol', null, day.visits.map(function (v) {
+            return h('li', null, h('strong', { text: v.outletName }), ' ', h('span', { class: 'small quiet', text: v.outletCode + ' · ' + timeOnly(v.at) +
+              (v.distanceM !== null && v.distanceM !== '' ? ' · ' + metres(v.distanceM) + ' from shop' : '') + (v.observation === 'missing' ? ' · countertop missing' : '') }));
+          })) : h('p', { class: 'small quiet', text: 'No verified visit.' }));
+      }),
+      d.otherAttempts ? h('p', { class: 'small quiet', text: d.otherAttempts + ' other attempt(s) not completed or not accepted are not counted.' }) : null,
+      h('p', { class: 'summary-foot', text: 'Generated ' + when(d.generatedAt) + ' from the EBM Countertop Tracker. Only GPS-verified visits are listed.' }));
+    return [controls, card, h('p', { class: 'small quiet no-shot', text: 'Take a screenshot of the summary and send it to your TSM.' })];
+  }
+  function timeOnly(iso) { return iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Karachi' }) : ''; }
+
+  var teamFilter = null;
+  function pkToday(offsetDays) { return new Date(Date.now() + 5 * 3600000 - (offsetDays || 0) * 86400000).toISOString().slice(0, 10); }
+  function showTeam() {
+    var f = teamFilter || { from: pkToday(6), to: pkToday(0), employeeId: '', show: '' };
+    api.call('teamVisits', f).then(function (res) {
+      if (!res.ok) { loadFailed(res, showTeam); return; }
+      var d = res.data;
+      var lab = function (text, el) { return h('label', { class: 'field' }, h('span', { class: 'label', text: text }), el); };
+      var fromIn = h('input', { type: 'date', value: d.from, max: pkToday(0), 'aria-label': 'From date' });
+      var toIn = h('input', { type: 'date', value: d.to, max: pkToday(0), 'aria-label': 'To date' });
+      var who = h('select', { 'aria-label': 'Person' }, h('option', { value: '', text: 'Everyone' }),
+        d.choosable.map(function (p) { var o = h('option', { value: p.id, text: p.name + ' · ' + p.code }); if (p.id === f.employeeId) o.selected = true; return o; }));
+      var showSel = h('select', { 'aria-label': 'Which visits' }, [['', 'All visits'], ['verified', 'Verified only'], ['other', 'Not completed / rejected']].map(function (x) {
+        var o = h('option', { value: x[0], text: x[1] }); if (x[0] === (f.show || '')) o.selected = true; return o; }));
+      var apply = button('Show', function () {
+        teamFilter = { from: fromIn.value, to: toIn.value, employeeId: who.value, show: showSel.value }; showTeam();
+      }, 'btn-primary btn-block', { 'data-testid': 'team-apply' });
+      var quick = h('div', { class: 'chips' }, [['Today', 0], ['Last 3 days', 2], ['Last 7 days', 6], ['Last 30 days', 29]].map(function (q) {
+        return button(q[0], function () { teamFilter = Object.assign({}, f, { from: pkToday(q[1]), to: pkToday(0) }); showTeam(); }, 'btn-sm btn-secondary');
+      }));
+      var summary = d.people.length ? h('ul', { class: 'list', 'data-testid': 'team-people' }, d.people.map(function (p) {
+        return h('li', { class: p.verified ? '' : 'not-working' }, h('div', { class: 'row' }, h('div', { class: 'row-main' }, h('strong', { text: p.name }),
+          h('span', { class: 'small quiet', text: p.designation + ' · ' + p.code })),
+          p.verified ? h('span', { class: 'small', text: p.verified + ' verified · ' + p.outlets + ' outlets' + (p.total > p.verified ? ' · ' + (p.total - p.verified) + ' other' : '') })
+            : h('span', { class: 'badge lv-critical', text: p.total ? 'No verified visit (' + p.total + ' tried)' : 'No visit' })));
+      })) : null;
+      var visits = d.visits.length ? h('ul', { class: 'list', 'data-testid': 'team-visits' }, d.visits.map(function (v) {
+        return h('li', null, h('div', { class: 'row' },
+          h('div', { class: 'row-main' }, h('strong', { text: v.outletName }),
+            h('span', { class: 'small', text: v.employeeName + ' (' + v.designation + ')' }),
+            h('span', { class: 'small quiet', text: when(v.at) + ' · ' + v.territory + (v.distanceM !== null && v.distanceM !== '' ? ' · ' + metres(v.distanceM) + ' from shop' : '') +
+              (v.observation === 'missing' ? ' · countertop missing' : '') }),
+            v.result ? h('span', { class: 'small', text: v.result }) : null,
+            h('div', { class: 'photo-btns' },
+              v.fasciaPhotoId ? button('Shop front', function () { teamPhoto(v.fasciaPhotoId, 'Shop front · ' + v.outletName); }, 'btn-sm btn-secondary') : null,
+              v.countertopPhotoId ? button('Countertop', function () { teamPhoto(v.countertopPhotoId, 'Countertop · ' + v.outletName); }, 'btn-sm btn-secondary') : null)),
+          h('span', { class: 'badge ' + (v.counts ? 'lv-normal' : v.status === 'submitted_for_review' ? 'lv-info' : 'lv-muted'), text: v.statusText })));
+      })) : h('p', { class: 'quiet', text: 'No visits in these dates.' });
+      frame([h('h1', { text: 'Team visits' }),
+        h('p', { class: 'small quiet', text: 'Order bookers, supervisors and MOs at the outlets of your territory and team.' }),
+        h('section', { class: 'card filters' }, quick, h('div', { class: 'grid-2' }, lab('From', fromIn), lab('To', toIn)), lab('Person', who), lab('Show', showSel), apply),
+        h('h2', { text: 'By person (' + d.from + ' to ' + d.to + ')' }),
+        d.notWorking ? msg('error', d.notWorking + (d.notWorking === 1 ? ' person has' : ' people have') + ' no verified visit in these dates.', 'not-working-msg') : null,
+        summary || h('p', { class: 'quiet', text: 'Nobody is tagged to your outlets yet.' }),
+        h('h2', { text: 'Visits (' + d.total + ')' }), d.truncated ? msg('info', 'Showing the latest 300. Narrow the dates or pick a person to see the rest.') : null, visits], 'team');
+    });
+  }
+  function teamPhoto(photoId, title) {
+    var dlg = h('dialog', { class: 'viewer', 'aria-label': title });
+    var body = h('div', null, h('p', { text: 'Loading photo…' }));
+    add(dlg, h('div', { class: 'viewer-head' }, h('strong', { text: title }), button('Close', function () { dlg.close(); dlg.remove(); }, 'btn-sm')), body);
+    document.body.appendChild(dlg); dlg.showModal();
+    api.call('photo', { photoId: photoId }).then(function (r) {
+      body.textContent = '';
+      if (!r.ok) { add(body, msg('error', r.error)); return; }
+      add(body, h('img', { src: 'data:' + r.data.mime + ';base64,' + r.data.data, alt: title }));
     });
   }
 
@@ -527,6 +630,7 @@
     if (hash === '#/home') showHome();
     else if (hash === '#/outlets') showOutlets();
     else if (hash === '#/visits') showVisits();
+    else if (hash === '#/team' && profile && profile.seesTeamVisits) showTeam();
     else if ((m = /^#\/outlet\/(.+)$/.exec(hash))) showOutlet(decodeURIComponent(m[1]));
     else if ((m = /^#\/visit\/([0-9a-f-]{36})$/.exec(hash))) showVisit(m[1]);
     else go('#/home');
