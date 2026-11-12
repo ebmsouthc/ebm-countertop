@@ -86,7 +86,8 @@
   function frame(content, tab, opts) {
     opts = opts || {};
     var top = h('header', { class: 'topbar' }, h('div', { class: 'topbar-inner' },
-      h('div', null, h('div', { class: 'who', text: profile ? profile.name : 'EBM Countertop' }),
+      h('img', { class: 'topbar-logo', src: 'ebm-logo.png', alt: 'EBM' }),
+      h('div', { class: 'topbar-text' }, h('div', { class: 'who', text: profile ? profile.name : 'EBM Countertop' }),
         profile ? h('div', { class: 'role', text: profile.designationName + (profile.territory ? ', ' + profile.territory + ' territory' : '') + ' · ' + profile.code }) : null),
       profile ? button('Sign out', signOut, 'btn-ghost', { 'data-testid': 'sign-out' }) : null));
     var tabs = opts.noTabs || !profile || profile.isAdmin ? null : h('nav', { class: 'tabbar', 'aria-label': 'Main' }, h('ul', null,
@@ -133,7 +134,7 @@
       h('div', { class: 'field' }, h('label', { for: 'code', text: 'Employee code' }), code),
       h('div', { class: 'field' }, h('label', { for: 'password', text: 'Password' }), h('div', { class: 'input-row' }, pw, toggle)),
       out, submit);
-    show(h('main', { class: 'page-plain' }, h('div', { class: 'brand' }, h('img', { src: 'icons/icon-192.png', alt: '', width: 56, height: 56 }),
+    show(h('main', { class: 'page-plain' }, h('div', { class: 'brand' }, h('img', { class: 'brand-logo', src: 'ebm-logo.png', alt: 'EBM' }),
       h('div', null, h('h1', { text: 'EBM Countertop Tracker' }), h('p', { class: 'quiet', text: 'Sign in with your own employee code.' }))),
       notice ? msg('info', notice, 'login-notice') : null, form,
       h('p', { class: 'quiet small center', text: 'Forgot your password? Ask your administrator to reset it.' })));
@@ -534,6 +535,7 @@
     var fmtDay = function (iso) { return new Date(iso + 'T12:00:00+05:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Karachi' }); };
     var period = d.from === d.to ? fmtDay(d.from) : fmtDay(d.from) + ' – ' + fmtDay(d.to);
     var card = h('section', { class: 'card summary-card', 'data-testid': 'visit-summary' },
+      h('img', { class: 'summary-logo', src: 'ebm-logo.png', alt: 'EBM' }),
       h('p', { class: 'summary-eyebrow', text: 'PG Counter Top Tracker · visit summary' }),
       h('h2', { text: d.person.name }),
       h('p', { class: 'small quiet', text: d.person.designation + ' · ' + d.person.code + (d.person.territory ? ' · ' + d.person.territory : '') }),

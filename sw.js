@@ -1,8 +1,8 @@
 /* Service worker: makes the app installable and shows a clear page when there is no connection.
  * Only the app's own files are cached. Requests to the back end are never cached or replayed. */
 'use strict';
-var CACHE = 'ebm-g4-v9';
-var SHELL = ['./', 'index.html', 'app.css', 'app.js', 'admin.js', 'xlsx.js', 'api.js', 'camera.js', 'config.js', 'offline.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'];
+var CACHE = 'ebm-g4-v11';
+var SHELL = ['./', 'index.html', 'app.css', 'app.js', 'admin.js', 'xlsx.js', 'api.js', 'camera.js', 'config.js', 'offline.html', 'manifest.webmanifest', 'ebm-logo.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'];
 
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));

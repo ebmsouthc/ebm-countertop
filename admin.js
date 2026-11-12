@@ -26,7 +26,8 @@
       })));
     })));
     U.show([h('header', { class: 'topbar' }, h('div', { class: 'topbar-inner wide' },
-      h('div', null, h('div', { class: 'who', text: 'EBM Countertop Tracker' }), h('div', { class: 'role', text: 'Administration · ' + (p.name || '') + ' · ' + (p.code || '') })),
+      h('img', { class: 'topbar-logo', src: 'ebm-logo.png', alt: 'EBM' }),
+      h('div', { class: 'topbar-text' }, h('div', { class: 'who', text: 'EBM Countertop Tracker' }), h('div', { class: 'role', text: 'Administration · ' + (p.name || '') + ' · ' + (p.code || '') })),
       button('Sign out', U.signOut, 'btn-ghost', { 'data-testid': 'sign-out' }))), nav, h('main', { class: 'page admin-page' }, content)]);
   }
   function call(action, payload) { return api.call(action, payload || {}); }
@@ -322,8 +323,8 @@
       frame('compliance', [h('h1', { text: 'Compliance' }),
         d.reference ? h('p', { class: 'quiet', text: 'Judged against planogram reference version ' + d.reference.version + '.' }) : msg('error', 'No approved planogram reference yet. Upload and approve one under Set up › Planogram reference.', 'no-reference'),
         d.waitingLocationReview ? msg('info', d.waitingLocationReview + ' visit(s) must have their location approved first (Location reviews).') : null,
-        d.ai && d.ai.enabled ? msg('ok', 'Automatic check (AI) is on: correct and incorrect planograms are decided automatically; only visits the AI is not sure about are listed here.' +
-          (d.ai.checking ? ' ' + d.ai.checking + ' visit(s) are being checked now.' : ''), 'ai-on') : msg('info', 'Automatic check (AI) is off: every visit needs a decision here.', 'ai-off'),
+        d.ai && d.ai.enabled ? msg('ok', 'Automatic check (AI) is on: correct and incorrect planograms are decided automatically. Listed here: visits the AI is not sure about' +
+          (d.ai.checking ? ', and at the bottom ' + d.ai.checking + ' visit(s) the AI is still checking (it runs every 5 minutes).' : '.'), 'ai-on') : msg('info', 'Automatic check (AI) is off: every visit needs a decision here.', 'ai-off'),
         h('nav', { class: 'tabs' }, h('a', { href: '#/admin/compliance', 'aria-current': tab !== 'decided' ? 'page' : null, text: 'Waiting for a decision' }),
           h('a', { href: '#/admin/compliance?tab=decided', 'aria-current': tab === 'decided' ? 'page' : null, text: 'Decided' })),
         table([{ label: 'Visit', render: function (r) { return h('a', { href: '#/admin/compliance/' + r.visitId, text: when(r.submittedAt) }); } },
