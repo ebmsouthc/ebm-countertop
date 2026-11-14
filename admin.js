@@ -11,7 +11,7 @@
   var DESIG = [['ORDER_BOOKER', 'Order Booker'], ['SUPERVISOR', 'Supervisor'], ['MO', 'MO'], ['TSM', 'TSM'], ['ASM', 'ASM'], ['AMTM', 'AMTM'], ['RSM', 'RSM'], ['SYSTEM_ADMIN', 'System Administrator']];
   var NAV = [
     ['Monitor', [['dashboard', 'Dashboard'], ['outlets', 'Outlets'], ['reports', 'Reports']]],
-    ['Review', [['location', 'Location reviews'], ['compliance', 'Compliance'], ['planogram-errors', 'Planogram errors'], ['missing', 'Missing countertops']]],
+    ['Review', [['location', 'Location reviews'], ['compliance', 'Compliance'], ['planogram-errors', 'Planogram errors'], ['missing', 'Missing countertops'], ['far', 'Far from radius']]],
     ['Set up', [['people', 'People'], ['settings', 'Settings'], ['reference', 'Planogram reference'], ['audit', 'Audit log']]]
   ];
   var badges = {};
@@ -115,7 +115,7 @@
     var timer = null;
     function draw(d) {
       var k = d.kpis;
-      badges = { location: d.queues.locationReviews, compliance: d.queues.compliance, missing: d.queues.missingOpen };
+      badges = { location: d.queues.locationReviews, far: d.queues.farReviews, compliance: d.queues.compliance, missing: d.queues.missingOpen };
       var eng = d.engine, stale = !eng || eng.minutesAgo > 75;
       var kpi = function (label, value, cls, href, testid) {
         return h(href ? 'a' : 'div', { class: 'kpi ' + (cls || ''), href: href || null, 'data-testid': testid }, h('span', { class: 'kpi-label', text: label }), h('b', { class: 'num', text: value === null ? '–' : String(value) }));
@@ -295,7 +295,7 @@
     load('adminLocationReviews', {}, function (d) {
       badges.location = d.visits.length;
       frame('location', [h('h1', { text: 'Location reviews' }),
-        h('p', { class: 'quiet', text: 'Visits whose GPS could not prove "within 50 m". Approve only if the shop-front photo clearly shows this shop. A reason is always required.' }),
+        h('p', { class: 'quiet', text: 'Visits whose GPS could not prove they were inside the radius (weak GPS). Approve only if the shop-front photo clearly shows this shop. A reason is always required. Visits clearly outside the radius are under Far from radius.' }),
         d.visits.length ? h('div', { class: 'stack', 'data-testid': 'location-queue' }, d.visits.map(function (v) {
           var shot = h('div', { class: 'photo-box' });
           var fascia = v.photos.filter(function (p) { return p.type === 'fascia'; }).pop();
@@ -315,6 +315,50 @@
           ], { 'data-testid': 'location-item' });
         })) : msg('ok', 'No visit is waiting for a location review.', 'location-empty')]);
     }, 'location');
+  }
+
+  // ------------------------------------------------------------------ far from radius (14 Nov 2026)
+  function farFromRadius() {
+    load('adminLocationReviews', { far: true }, function (d) {
+      badges.far = d.visits.length;
+      var m = function (x) { return x === null || x === undefined || x === '' ? '–' : (x >= 1000 ? (Math.round(x / 100) / 10) + ' km' : Math.round(x) + ' m'); };
+      var waiting = d.visits.length ? h('div', { class: 'stack', 'data-testid': 'far-queue' }, d.visits.map(function (v) {
+        var shot = h('div', { class: 'photo-box' }), counter = h('div', { class: 'photo-box' });
+        var fascia = v.photos.filter(function (p) { return p.type === 'fascia'; }).pop(), ct = v.photos.filter(function (p) { return p.type === 'countertop'; }).pop();
+        photoInto(shot, fascia && fascia.id, 'Shop front of ' + v.outlet.name);
+        photoInto(counter, ct && ct.id, 'Countertop at ' + v.outlet.name);
+        var g = v.checks.filter(function (c) { return c.result === 'far_accepted'; }).pop() || v.checks[v.checks.length - 1] || {};
+        return card(v.outlet.name + ' · ' + v.outlet.code + ' · ' + (v.outlet.territory || ''), [
+          h('p', { class: 'far-distance', text: m(v.distanceM) + ' from the saved shop location (GPS ±' + Math.round(g.accuracyM || 0) + ' m)' }),
+          h('p', { class: 'small' }, v.employee.name + ' · submitted ' + when(v.submittedAt) + ' · saved location ', mapLink(v.outlet.lat, v.outlet.lon),
+            ' · on-site reading ', g.lat ? mapLink(g.lat, g.lon, Number(g.lat).toFixed(7) + ', ' + Number(g.lon).toFixed(7)) : '–'),
+          h('div', { class: 'grid-2' }, shot, counter),
+          form([field('Reason', h('textarea', { id: 'fr-' + v.id, name: 'reason', class: 'input', rows: 2 })),
+            h('fieldset', { class: 'far-decision' }, h('legend', { text: 'Decision' }),
+              h('label', null, h('input', { type: 'radio', name: 'decision', value: 'fix' }), ' Approve, and move the saved shop location to this on-site reading (the coordinates were wrong)'),
+              h('label', null, h('input', { type: 'radio', name: 'decision', value: 'approve' }), ' Approve only: it is this shop (keep the saved location)'),
+              h('label', null, h('input', { type: 'radio', name: 'decision', value: 'reject' }), ' Reject: not at this shop'))],
+            'Save decision', function (f) {
+              var dec = f.querySelector('input[name=decision]:checked'), dv = dec ? dec.value : '';
+              return call('adminDecideLocation', { visitId: v.id, decision: dv === 'fix' ? 'approve' : dv, fixCoordinates: dv === 'fix', reason: val(f, 'reason') });
+            }, { done: function () { farFromRadius(); } })
+        ], { 'data-testid': 'far-item' });
+      })) : msg('ok', 'No far-from-radius visit is waiting for a decision.', 'far-empty');
+      var outletsTable = d.outlets.length ? table([
+        { label: 'Outlet', render: function (r) { return h('a', { href: '#/admin/outlet/' + encodeURIComponent(r.outletId), text: r.name }); } },
+        { label: 'Code', key: 'code' }, { label: 'Territory', key: 'territory' },
+        { label: 'Far visits', key: 'farVisits' }, { label: 'Waiting', key: 'waiting' },
+        { label: 'Last distance', render: function (r) { return m(r.last.distanceM); } },
+        { label: 'Last visit', render: function (r) { return when(r.last.at) + ' · ' + r.last.by; } },
+        { label: 'Saved location', render: function (r) { return mapLink(r.lat, r.lon); } },
+        { label: 'Last on-site reading', render: function (r) { return r.last.lat ? mapLink(r.last.lat, r.last.lon, Number(r.last.lat).toFixed(7) + ', ' + Number(r.last.lon).toFixed(7)) : '–'; } },
+        { label: 'Coordinates', render: function (r) { return r.coordinatesCorrectedAt ? h('span', { class: 'badge lv-normal', text: 'Corrected ' + when(r.coordinatesCorrectedAt) }) : h('span', { class: 'badge lv-critical', text: 'Check / fix' }); } }
+      ], d.outlets) : msg('ok', 'No outlet has had a visit outside the radius.');
+      frame('far', [h('h1', { text: 'Far from radius' }),
+        h('p', { class: 'quiet', text: 'Visits submitted from more than ' + d.radiusM + ' m from the saved shop location. They are kept as evidence and count only after you approve them. Many far visits at one outlet usually mean its saved coordinates are wrong.' }),
+        h('h2', { text: 'Waiting for a decision (' + d.visits.length + ')' }), waiting,
+        h('h2', { text: 'Outlets with far visits (' + d.outlets.length + ')' }), h('div', { 'data-testid': 'far-outlets' }, outletsTable)]);
+    }, 'far');
   }
 
   function compliance(tab) {
@@ -511,7 +555,7 @@
           [['Geofence radius', s.geofence_radius_m + ' m'], ['Best GPS accuracy that can pass automatically', s.gps_max_accuracy_m + ' m'], ['Worst usable accuracy (review)', s.gps_review_max_accuracy_m + ' m'],
             ['GPS attempts per visit', s.max_gps_attempts], ['Photo must be taken within', Math.round(s.photo_max_age_seconds / 60) + ' minutes'],
             ['Overdue / High priority / Critical', s.alert_overdue_days + ' / ' + s.alert_high_priority_days + ' / ' + s.alert_critical_days + ' days'],
-            ['Login lockout', s.login_max_failures + ' wrong passwords → ' + s.login_lockout_minutes + ' minutes'], ['Session ends after', Math.round(s.session_idle_minutes / 60) + ' hours unused']]
+            ['Login lockout', s.login_max_failures + ' wrong passwords → ' + s.login_lockout_minutes + ' minutes'], ['Signed in until', s.session_never_expires === true ? 'the person taps Sign out (or their password is reset / login suspended)' : Math.round(s.session_idle_minutes / 60) + ' hours unused']]
             .map(function (x) { return [h('dt', { text: x[0] }), h('dd', { text: String(x[1]) })]; }))),
         h('p', { class: 'small quiet', text: 'Changing a verification rule is a reviewed technical change (it changes what counts as a visit).' })]);
     }, 'settings');
@@ -627,6 +671,7 @@
       case 'compliance': if (arg) complianceDecide(arg); else compliance(tab); break;
       case 'planogram-errors': planogramErrors(); break;
       case 'missing': missing(tab); break;
+      case 'far': farFromRadius(); break;
       case 'people': people(); break;
       case 'person': person(arg); break;
       case 'settings': settings(); break;

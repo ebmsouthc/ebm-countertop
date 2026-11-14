@@ -244,3 +244,8 @@ code { font-family: ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
 .summary-day li { margin: 3px 0; }
 .summary-foot { font-size: 11px; color: var(--ink-2); margin: 12px 0 0; }
 li.not-working { background: #fdecea; }
+
+/* far from radius (14 Nov 2026) */
+.far-distance { font-size: 20px; font-weight: 800; color: var(--high); margin: 0 0 4px; }
+.card-far { border-left: 6px solid var(--high); background: var(--high-bg); }
+.far-decision label { display: block; margin: 8px 0; }

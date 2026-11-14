@@ -248,7 +248,7 @@
         h('div', null, h('strong', { text: o.levelText }),
           h('p', { class: 'small', text: o.lastVisitAt ? 'Last verified visit ' + day(o.lastVisitAt) + (o.lastVisitBy ? ', ' + o.lastVisitBy : '') : 'No verified visit yet' })));
       var startArea = h('div', { class: 'stack' });
-      if (o.demo) add(startArea, msg('info', 'DEMO outlet: your distance from the registered point is checked and shown, but the 50 m limit is not enforced. Demo visits never count on the dashboard or in reports.'));
+      if (o.demo) add(startArea, msg('info', 'DEMO outlet: your distance from the registered point is checked and shown, but the ' + o.radiusM + ' m limit is not enforced. Demo visits never count on the dashboard or in reports.'));
       if (!o.monitored && !o.demo) add(startArea, msg('info', 'This outlet is not active with a deployed countertop, so no visit can be recorded.'));
       else if (o.myOpenVisitId) add(startArea, button('Continue visit', function () { go('#/visit/' + o.myOpenVisitId); }, 'btn-primary btn-block btn-lg'));
       else add(startArea, startButton(o, startArea));
@@ -262,7 +262,7 @@
           h('dt', { text: 'Planogram' }), h('dd', { text: pg[o.planogram] || o.planogram }),
           o.visitsAwaitingReview ? [h('dt', { text: 'Review' }), h('dd', { text: o.visitsAwaitingReview + (o.visitsAwaitingReview === 1 ? ' visit' : ' visits') + ' waiting for location review' })] : null)),
         h('section', { class: 'card' }, h('h2', { text: 'Location' }),
-          h('p', { class: 'small', text: 'Registered point ' + o.lat + ', ' + o.lon + (o.demo ? '. Demo outlet: the distance is shown but the ' + o.radiusM + ' m limit is not enforced.' : '. Your phone must be within ' + o.radiusM + ' m when you take the shop-front photo.') }),
+          h('p', { class: 'small', text: 'Registered point ' + o.lat + ', ' + o.lon + (o.demo ? '. Demo outlet: the distance is shown but the ' + o.radiusM + ' m limit is not enforced.' : '. Be within ' + o.radiusM + ' m when you take the shop-front photo. Farther away you can still submit, but the visit counts only after trade marketing approves it.') }),
           h('a', { class: 'btn btn-secondary btn-block', href: 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(o.lat + ',' + o.lon), target: '_blank', rel: 'noopener noreferrer', text: 'Open in Google Maps' })),
         h('section', { class: 'card' }, h('h2', { text: 'Responsible' }), h('dl', { class: 'kv' },
           o.responsible.map(function (r) { return [h('dt', { text: ROLE[r.role] || r.role }), h('dd', { text: r.name })]; }))),
@@ -385,6 +385,15 @@
           button('Next: countertop photo', function () { showVisit(v.id); }, 'btn-primary btn-block btn-lg'));
         return;
       }
+      if (c.result === 'far_accepted') {
+        gps.stop();
+        add(body, h('section', { class: 'card card-far', role: 'status', 'data-testid': 'gps-result' },
+          h('h2', { text: 'Outside the ' + c.radiusM + ' m radius' }),
+          h('p', { class: 'far-distance', text: metres(c.distanceM) + ' from the saved shop location' }),
+          h('p', { text: d.message })),
+          button('Next: countertop photo', function () { showVisit(v.id); }, 'btn-primary btn-block btn-lg'));
+        return;
+      }
       if (c.result === 'demo_accepted') {
         gps.stop();
         var outside = c.distanceM > c.radiusM;
@@ -422,7 +431,7 @@
     }
     add(cancelArea, cancelVisitButton(v), h('a', { class: 'link-center', href: '#/home', text: 'Leave and finish later' }));
     frame([stepHeader(1, v.outletName, 'Photo of the shop front'), gpsLine, body, cancelArea], null, { noTabs: true });
-    if (st.lastCheck && st.lastCheck.result !== 'pass') {
+    if (st.lastCheck && st.lastCheck.result !== 'pass' && st.lastCheck.result !== 'far_accepted') {
       result({ check: st.lastCheck, attemptsLeft: st.attemptsLeft, canSendForReview: st.canSendForReview, visit: v,
         message: 'Your last attempt was not verified (' + st.lastCheck.result.replace('_', ' ') + (st.lastCheck.distanceM !== null ? ', ' + metres(st.lastCheck.distanceM) : '') + ').' });
     } else takePhoto();
@@ -441,7 +450,7 @@
     var v = st.visit, observation = null, pending = null, current = null;
     var body = h('div', { class: 'stack' });
     cleanup = function () { if (current) current.stopCamera(); };
-    var reviewNote = v.status === 'review_pending' ? msg('info', 'Your location will be checked by a reviewer. This visit counts only after approval.', 'review-note') : null;
+    var reviewNote = v.status === 'review_pending' ? msg('info', v.outsideRadius ? 'You were outside the radius: trade marketing will check this visit (the saved shop location may be wrong). It counts once they approve it.' : 'Your location will be checked by a reviewer. This visit counts only after approval.', 'review-note') : null;
     function takePhoto(note) {
       body.textContent = '';
       if (note) add(body, note);
